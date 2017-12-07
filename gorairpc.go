@@ -407,7 +407,6 @@ func (r *RaiRpc) RpcKeepalive(address, port string) map[string]interface{} {
 	params := map[string]interface{}{"action": "keepalive", "address": address, "port": port}
 	mapRes := r.callRpc(params)
 	return mapRes
-	err
 }
 
 func (r *RaiRpc) RpcKeyCreate() map[string]interface{} {
@@ -422,36 +421,43 @@ func (r *RaiRpc) RpcKeyExpand(key string) map[string]interface{} {
 	return mapRes
 }
 
-func (r *RaiRpc) RpcPasswordChange(wallet, password string) map[string]interface{} {
+func (r *RaiRpc) RpcLedger(account, count string, representative, weight, pending, sorting bool) string {
+	// account = 'xrb_1111111111111111111111111111111111111111111111111117353trpda', count = '1048576',
+	// representative = false, weight = false, pending = false, sorting = false
+	params := map[string]interface{}{"action": "ledger", "account": account, "count": count,
+		"representative": representative, "weight": weight, "pending": pending, "sorting": sorting}
+	mapRes := r.callRpc(params)
+	return mapRes["accounts"].(string)
+}
+
+func (r *RaiRpc) RpcPasswordChange(wallet, password string) string {
 	params := map[string]interface{}{"action": "password_change", "wallet": wallet, "password": password}
 	mapRes := r.callRpc(params)
-	return mapRes
+	return mapRes["changed"].(string)
 }
 
-func (r *RaiRpc) RpcPasswordEnter(wallet, password string) map[string]interface{} {
+func (r *RaiRpc) RpcPasswordEnter(wallet, password string) string {
 	params := map[string]interface{}{"action": "password_enter", "wallet": wallet, "password": password}
 	mapRes := r.callRpc(params)
-	return mapRes
+	return mapRes["valid"].(string)
 }
 
-func (r *RaiRpc) RpcPasswordValid(wallet, password string) map[string]interface{} {
+func (r *RaiRpc) RpcPasswordValid(wallet, password string) string {
 	params := map[string]interface{}{"action": "password_valid", "wallet": wallet}
 	mapRes := r.callRpc(params)
-	return mapRes
+	return mapRes["valid"].(string)
 }
 
-func (r *RaiRpc) RpcPaymentBegin(wallet, password string) map[string]interface{} {
+func (r *RaiRpc) RpcPaymentBegin(wallet, password string) string {
 	params := map[string]interface{}{"action": "payment_begin", "wallet": wallet}
 	mapRes := r.callRpc(params)
-	// payment_begin.account
-	return mapRes
+	return mapRes["account"].(string)
 }
 
-func (r *RaiRpc) RpcPaymentInit(wallet string) map[string]interface{} {
+func (r *RaiRpc) RpcPaymentInit(wallet string) string {
 	params := map[string]interface{}{"action": "payment_init", "wallet": wallet}
 	mapRes := r.callRpc(params)
-	// payment_init.status
-	return mapRes
+	return mapRes["status"].(string)
 }
 
 func (r *RaiRpc) RpcPaymentEnd(account, wallet string) map[string]interface{} {
@@ -460,22 +466,22 @@ func (r *RaiRpc) RpcPaymentEnd(account, wallet string) map[string]interface{} {
 	return mapRes
 }
 
-func (r *RaiRpc) RpcPaymentWait(account, amount, timeout string) map[string]interface{} {
+func (r *RaiRpc) RpcPaymentWait(account, amount, timeout string) string {
 	params := map[string]interface{}{"action": "payment_wait", "account": account, "amount": amount, "timeout": timeout}
 	mapRes := r.callRpc(params)
-	return mapRes
+	return mapRes["status"].(string)
 }
 
-func (r *RaiRpc) RpcProcess(block string) map[string]interface{} {
+func (r *RaiRpc) RpcProcess(block string) string {
 	params := map[string]interface{}{"action": "process", "block": block}
 	mapRes := r.callRpc(params)
-	return mapRes
+	return mapRes["hash"].(string)
 }
 
-func (r *RaiRpc) RpcPeers() map[string]interface{} {
+func (r *RaiRpc) RpcPeers() string {
 	params := map[string]interface{}{"action": "peers"}
 	mapRes := r.callRpc(params)
-	return mapRes
+	return mapRes["peers"].(string)
 }
 
 func (r *RaiRpc) RpcPending(account, count, threshold, unit string) map[string]interface{} {
