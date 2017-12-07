@@ -484,29 +484,36 @@ func (r *RaiRpc) RpcPeers() string {
 	return mapRes["peers"].(string)
 }
 
-func (r *RaiRpc) RpcPending(account, count, threshold, unit string) map[string]interface{} {
-	// count = '4096', threshold = 0, unit = 'raw'
-	params := map[string]interface{}{"action": "pending", "account": account, "count": count, "threshold": threshold}
+func (r *RaiRpc) RpcPending(account, count string, threshold int, unit string, source bool) map[string]interface{} {
+	// count = '4096', threshold = 0, unit = 'raw', source = false
+	params := map[string]interface{}{"action":"pending","account":account,"count":count,"threshold":threshold,"source":source}
 	mapRes := r.callRpc(params)
-	//if (threshold != 0) {
-	//for (let hash in pending.blocks) {
-	//pending.blocks[hash] = this.unit(pending.blocks[hash], 'raw', unit);
-	//}
-	//}
-	//return pending.blocks;
-	return mapRes
+	blocks := mapRes["blocks"].(map[string]interface{})
+	if source {
+		for k, v := range blocks {
+			val := v.(map[string]string)
+			val["amount"] = r.ToUnit(val["amount"], "raw", unit)
+			blocks[k] = val
+		}
+	} else if threshold != 0 {
+		for hash, v := range blocks {
+			blocks[hash] = r.ToUnit(v.(string), "raw", unit)
+		}
+	}
+	return blocks
 }
 
-func (r *RaiRpc) RpcPendingExists(hash string) map[string]interface{} {
+func (r *RaiRpc) RpcPendingExists(hash string) string {
 	params := map[string]interface{}{"action": "pending_exists", "hash": hash}
 	mapRes := r.callRpc(params)
-	return mapRes
+	return mapRes["exists"].(string)
 }
 
-func (r *RaiRpc) RpcReceive(wallet, account, block string) map[string]interface{} {
-	params := map[string]interface{}{"action": "receive", "wallet": wallet, "account": account, "block": block}
+func (r *RaiRpc) RpcReceive(wallet, account, block, work string) string {
+	// work = '0000000000000000'
+	params := map[string]interface{}{"action":"receive","wallet":wallet,"account":account,"block":block,"work":work}
 	mapRes := r.callRpc(params)
-	return mapRes
+	return mapRes["block"].(string)
 }
 
 func (r *RaiRpc) RpcReceiveMinimum(unit string) string {
@@ -517,12 +524,12 @@ func (r *RaiRpc) RpcReceiveMinimum(unit string) string {
 	return amount
 }
 
-func (r *RaiRpc) RpcReceiveMinimumSet(amount, unit string) map[string]interface{} {
+func (r *RaiRpc) RpcReceiveMinimumSet(amount, unit string) string {
 	// unit = 'raw'
 	rawAmount := r.ToUnit(amount, unit, "raw")
 	params := map[string]interface{}{"action": "receive_minimum_set", "amount": rawAmount}
 	mapRes := r.callRpc(params)
-	return mapRes
+	return mapRes["success"].(string)
 }
 
 func (r *RaiRpc) RpcRepresentatives(unit, count, sorting string) map[string]interface{} {
@@ -565,10 +572,10 @@ func (r *RaiRpc) RpcSend(wallet, source, destination, amount, unit string) strin
 	return mapRes["block"].(string)
 }
 
-func (r *RaiRpc) RpcStop() map[string]interface{} {
+func (r *RaiRpc) RpcStop() string {
 	params := map[string]interface{}{"action": "stop"}
 	mapRes := r.callRpc(params)
-	return mapRes
+	return mapRes["success"].(string)
 }
 
 func (r *RaiRpc) RpcSuccessors(block, count string) string {
@@ -582,11 +589,13 @@ func (r *RaiRpc) RpcUnchecked(count string) map[string]interface{} {
 	// count = '4096'
 	params := map[string]interface{}{"action": "unchecked", "count": count}
 	mapRes := r.callRpc(params)
-	//var blocks = unchecked.blocks;
-	//for(let key in blocks){
-	//blocks[key] = JSON.parse(blocks[key]);
-	//}
-	return mapRes
+	blocks := mapRes["blocks"].(map[string]interface{})
+	for k, v := range blocks {
+		var val interface{}
+		json.Unmarshal([]byte(v.(string)), &val)
+		blocks[k] = val
+	}
+	return blocks
 }
 
 func (r *RaiRpc) RpcUncheckedClear() string {

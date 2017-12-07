@@ -19,6 +19,7 @@ func main() {
 	fmt.Println("RpcRepresentatives:", rpc.RpcRepresentatives("Mrai", "1048576", "false"))
 
 	fmt.Printf("MraiToRaw: %v\n", rpc.RpcMraiToRaw("1"))
+
 	fmt.Printf("%v\n", rpc.ToUnit("1", "Mrai", "raw"))
 
 	fmt.Printf("End\n")
