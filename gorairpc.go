@@ -8,6 +8,7 @@ import (
 	"strings"
 	"io/ioutil"
 	"math/big"
+	"strconv"
 )
 
 // Struct
@@ -143,7 +144,8 @@ func (r *RaiRpc) RpcAccountList(wallet string) string {
 }
 
 func (r *RaiRpc) RpcAccountMove(wallet, source, accounts string) string {
-	params := map[string]interface{}{"action": "account_move", "wallet": wallet, "source": source, "accounts": accounts}
+	params := map[string]interface{}{"action": "account_move", "wallet": wallet,
+		"source": source, "accounts": accounts}
 	mapRes := r.callRpc(params)
 	return mapRes["moved"].(string)
 }
@@ -486,7 +488,8 @@ func (r *RaiRpc) RpcPeers() string {
 
 func (r *RaiRpc) RpcPending(account, count string, threshold int, unit string, source bool) map[string]interface{} {
 	// count = '4096', threshold = 0, unit = 'raw', source = false
-	params := map[string]interface{}{"action":"pending","account":account,"count":count,"threshold":threshold,"source":source}
+	params := map[string]interface{}{"action": "pending", "account": account,
+		"count": count, "threshold": threshold, "source": source}
 	mapRes := r.callRpc(params)
 	blocks := mapRes["blocks"].(map[string]interface{})
 	if source {
@@ -511,7 +514,8 @@ func (r *RaiRpc) RpcPendingExists(hash string) string {
 
 func (r *RaiRpc) RpcReceive(wallet, account, block, work string) string {
 	// work = '0000000000000000'
-	params := map[string]interface{}{"action":"receive","wallet":wallet,"account":account,"block":block,"work":work}
+	params := map[string]interface{}{"action": "receive", "wallet": wallet,
+		"account": account, "block": block, "work": work}
 	mapRes := r.callRpc(params)
 	return mapRes["block"].(string)
 }
@@ -567,7 +571,8 @@ func (r *RaiRpc) RpcSearchPendingAll() string {
 func (r *RaiRpc) RpcSend(wallet, source, destination, amount, unit string) string {
 	// unit = 'raw'
 	rawAmount := r.ToUnit(amount, unit, "raw")
-	params := map[string]interface{}{"action": "send", "wallet": wallet, "source": source, "destination": destination, "amount": rawAmount}
+	params := map[string]interface{}{"action": "send", "wallet": wallet, "source": source,
+		"destination": destination, "amount": rawAmount}
 	mapRes := r.callRpc(params)
 	return mapRes["block"].(string)
 }
@@ -614,11 +619,13 @@ func (r *RaiRpc) RpcUcheckedKeys(key, count string) map[string]interface{} {
 	// key = '0000000000000000000000000000000000000000000000000000000000000000', count = '4096'
 	params := map[string]interface{}{"action": "unchecked_keys", "key": key, "count": count}
 	mapRes := r.callRpc(params)
-	//var unchecked = unchecked_keys.unchecked;
-	//for(let key in unchecked){
-	//unchecked[key].contents = JSON.parse(unchecked[key].contents);
-	//}
-	return mapRes
+	unchecked := mapRes["unchecked"].(map[string]interface{})
+	for k, v := range unchecked {
+		val := v.(map[string]interface{})
+		json.Unmarshal([]byte(val["contents"].(string)), val["contents"])
+		unchecked[k] = val
+	}
+	return unchecked
 }
 
 func (r *RaiRpc) RpcValidateAccountNumber(account string) string {
@@ -643,15 +650,27 @@ func (r *RaiRpc) RpcWalletBalanceTotal(wallet, unit string) map[string]interface
 	// unit = 'raw'
 	params := map[string]interface{}{"action": "wallet_balance_total", "wallet": wallet}
 	mapRes := r.callRpc(params)
-	//var wallet_balance_total = { balance: this.unit(rpc_wallet_balance.balance, 'raw', unit), pending: this.unit(rpc_wallet_balance.pending, 'raw', unit) };
-	//return wallet_balance_total;
-	return mapRes
+	walletBalanceTotals := map[string]interface{}{
+		"balance": r.ToUnit(mapRes["balance"].(string), "raw", unit)
+		, "pending": r.ToUnit(mapRes["pending"].(string), "raw", unit)}
+	return walletBalanceTotals
 }
 
-func (r *RaiRpc) RpcWalletBalances(wallet string) string {
-	params := map[string]interface{}{"action": "wallet_balances", "wallet": wallet}
+func (r *RaiRpc) RpcWalletBalances(wallet, unit string, threshold int) map[string]interface{} {
+	// unit = 'raw', threshold = 0
+	if threshold != 0 {
+		threshold, _ = strconv.Atoi(r.ToUnit(strconv.Itoa(threshold), unit, "raw"))
+	}
+	params := map[string]interface{}{"action": "wallet_balances", "wallet": wallet, "threshold": threshold}
 	mapRes := r.callRpc(params)
-	return mapRes["balances"].(string)
+	walletBalances := mapRes["balances"].(map[string]interface{})
+	for k, v := range walletBalances {
+		val := v.(map[string]map[string]interface{})
+		val["account"]["balance"] = r.ToUnit(val["account"]["balance"].(string), "raw", unit)
+		val["account"]["pending"] = r.ToUnit(val["account"]["pending"].(string), "raw", unit)
+		walletBalances[k] = val
+	}
+	return walletBalances
 }
 
 func (r *RaiRpc) RpcWalletChangeSeed(wallet, seed string) string {
@@ -690,23 +709,27 @@ func (r *RaiRpc) RpcWalletFrontiers(wallet string) string {
 	return mapRes["frontiers"].(string)
 }
 
-func (r *RaiRpc) RpcWalletPending(wallet, count, threshold, unit string) map[string]interface{} {
-	// count = '4096', threshold = 0, unit = 'raw'
-	if threshold != "0" {
-		threshold = r.ToUnit(threshold, unit, "raw")
+func (r *RaiRpc) RpcWalletPending(wallet, count string, threshold int, unit string, source bool) map[string]interface{} {
+	//count = '4096', threshold = 0, unit = 'raw', source = false
+	if threshold != 0 {
+		threshold, _ = strconv.Atoi(r.ToUnit(strconv.Itoa(threshold), unit, "raw"))
 	}
-	params := map[string]interface{}{"action": "wallet_pending", "wallet": wallet, "count": count, "threshold": threshold}
+	params := map[string]interface{}{"action": "wallet_pending", "wallet": wallet,
+		"count": count, "threshold": threshold, "source": source}
 	mapRes := r.callRpc(params)
-
-	if threshold != "0" {
-		//for (let account in wallet_pending.blocks) {
-		//for (let hash in wallet_pending.blocks[account]) {
-		//wallet_pending.blocks[account][hash] = this.unit(wallet_pending.blocks[account][hash], 'raw', unit);
-		//}
-		//}
+	blocks := mapRes["blocks"].(map[string]interface{})
+	if source {
+		for k, v := range blocks {
+			val := v.(map[string]string)
+			val["amount"] = r.ToUnit(val["amount"], "raw", unit)
+			blocks[k] = val
+		}
+	} else if threshold != 0 {
+		for hash, v := range blocks {
+			blocks[hash] = r.ToUnit(v.(string), "raw", unit)
+		}
 	}
-	//return wallet_pending.blocks;
-	return mapRes
+	return blocks
 }
 
 func (r *RaiRpc) RpcWalletRepresentative(wallet string) string {
@@ -716,7 +739,8 @@ func (r *RaiRpc) RpcWalletRepresentative(wallet string) string {
 }
 
 func (r *RaiRpc) RpcWalletRepresentativeSet(wallet, representative string) string {
-	params := map[string]interface{}{"action": "wallet_representative_set", "wallet": wallet, "representative": representative}
+	params := map[string]interface{}{"action": "wallet_representative_set",
+		"wallet": wallet, "representative": representative}
 	mapRes := r.callRpc(params)
 	return mapRes["set"].(string)
 }
@@ -786,19 +810,16 @@ func (r *RaiRpc) RpcWorkPeersClear() string {
 func (r *RaiRpc) callRpc(params map[string]interface{}) map[string]interface{} {
 	// Prepare json POST request
 	reqString, err := json.Marshal(params)
-
 	res, err := http.Post(r.url, "application/json", strings.NewReader(string(reqString)))
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	var byteTab []byte
 	byteTab, err = ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	var dataMap map[string]interface{}
 	err = json.Unmarshal(byteTab, &dataMap)
 	if err != nil {
