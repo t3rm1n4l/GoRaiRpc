@@ -206,18 +206,14 @@ func (r *RaiRpc) RpcAccountsPending(accounts []string, count string, threshold i
 	blocks := mapRes["blocks"].(map[string]interface{})
 	if source {
 		for acc, accv := range blocks {
-			b := accv.(map[string]map[string]interface{})
-			for _, hashv := range b {
-				b[acc]["account"] = r.ToUnit(hashv["amount"].(string), "raw", unit)
-				blocks[acc] = b
+			for hkey, hashv := range accv.(map[string]interface{}) {
+				blocks[acc].(map[string]interface{})[hkey].(map[string]interface{})["amount"] = r.ToUnit(hashv.(map[string]interface{})["amount"].(string), "raw", unit)
 			}
 		}
 	} else if threshold != 0 {
 		for acc, accv := range blocks {
-			b := accv.(map[string]interface{})
-			for hash, hashv := range b {
-				b[hash] = r.ToUnit(hashv.(string), "raw", unit)
-				blocks[acc] = b
+			for hash, hashv := range accv.(map[string]interface{}) {
+				blocks[acc].(map[string]interface{})[hash] = r.ToUnit(hashv.(string), "raw", unit)
 			}
 		}
 	}
@@ -650,9 +646,7 @@ func (r *RaiRpc) RpcWalletBalanceTotal(wallet, unit string) map[string]interface
 	// unit = 'raw'
 	params := map[string]interface{}{"action": "wallet_balance_total", "wallet": wallet}
 	mapRes := r.callRpc(params)
-	walletBalanceTotals := map[string]interface{}{
-		"balance": r.ToUnit(mapRes["balance"].(string), "raw", unit)
-		, "pending": r.ToUnit(mapRes["pending"].(string), "raw", unit)}
+	walletBalanceTotals := map[string]interface{}{"balance": r.ToUnit(mapRes["balance"].(string), "raw", unit), "pending": r.ToUnit(mapRes["pending"].(string), "raw", unit)}
 	return walletBalanceTotals
 }
 
