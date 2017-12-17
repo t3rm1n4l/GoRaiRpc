@@ -490,9 +490,7 @@ func (r *RaiRpc) RpcPending(account, count string, threshold int, unit string, s
 	blocks := mapRes["blocks"].(map[string]interface{})
 	if source {
 		for k, v := range blocks {
-			val := v.(map[string]string)
-			val["amount"] = r.ToUnit(val["amount"], "raw", unit)
-			blocks[k] = val
+			blocks[k].(map[string]interface{})["amount"] = r.ToUnit(v.(map[string]interface{})["amount"].(string), "raw", unit)
 		}
 	} else if threshold != 0 {
 		for hash, v := range blocks {
