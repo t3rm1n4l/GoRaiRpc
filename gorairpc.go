@@ -647,7 +647,8 @@ func (r *RaiRpc) RpcWalletBalanceTotal(wallet, unit string) map[string]interface
 	// unit = "raw"
 	params := map[string]interface{}{"action": "wallet_balance_total", "wallet": wallet}
 	mapRes := r.callRpc(params)
-	walletBalanceTotals := map[string]interface{}{"balance": r.ToUnit(mapRes["balance"].(string), "raw", unit), "pending": r.ToUnit(mapRes["pending"].(string), "raw", unit)}
+	walletBalanceTotals := map[string]interface{}{"balance": r.ToUnit(mapRes["balance"].(string), "raw", unit),
+		"pending": r.ToUnit(mapRes["pending"].(string), "raw", unit)}
 	return walletBalanceTotals
 }
 
@@ -660,10 +661,10 @@ func (r *RaiRpc) RpcWalletBalances(wallet, unit string, threshold int) map[strin
 	mapRes := r.callRpc(params)
 	walletBalances := mapRes["balances"].(map[string]interface{})
 	for k, v := range walletBalances {
-		val := v.(map[string]map[string]interface{})
-		val["account"]["balance"] = r.ToUnit(val["account"]["balance"].(string), "raw", unit)
-		val["account"]["pending"] = r.ToUnit(val["account"]["pending"].(string), "raw", unit)
-		walletBalances[k] = val
+		balance := r.ToUnit(v.(map[string]interface{})["account"].(map[string]interface{})["balance"].(string), "raw", unit)
+		pending := r.ToUnit(v.(map[string]interface{})["account"].(map[string]interface{})["pending"].(string), "raw", unit)
+		walletBalances[k].(map[string]interface{})["account"].(map[string]interface{})["balance"] = balance
+		walletBalances[k].(map[string]interface{})["account"].(map[string]interface{})["pending"] = pending
 	}
 	return walletBalances
 }

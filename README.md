@@ -6,8 +6,9 @@ Go library for Raiblocks rpc commands
 #### DO NOT USE IN PRODUCTION (YET)
 
 ### Installing
-To start using GoRaiRpc, install Go 1.8 or above and run `go get`:
-
+* Go 1.8 or above
+* Raiblock wallet 9.0 or above with rpc enabled in config.json
+* Run `go get`:
 ```sh
 $ go get -u github.com/devmahno/GoRaiRpc
 ```
