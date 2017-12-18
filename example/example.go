@@ -34,6 +34,9 @@ func main() {
 	fmt.Printf("-RpcRepresentatives\n")
 	fmt.Println(rpc.RpcRepresentatives("Mrai", "1048576", "false"))
 
+	fmt.Printf("-RpcUcheckedKeys\n")
+	fmt.Println(rpc.RpcUcheckedKeys("03C9B2BDEAD1F1982BAF16A8E66CFCD493B464533151BC01BA27963B0AAF6D81", "1"))
+
 	fmt.Printf("-RpcMraiToRaw\n")
 	fmt.Printf("MraiToRaw: %v\n", rpc.RpcMraiToRaw("1"))
 

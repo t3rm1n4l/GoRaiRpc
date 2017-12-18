@@ -609,15 +609,15 @@ func (r *RaiRpc) RpcUncheckedGet(hash string) string {
 	return mapRes["contents"].(string)
 }
 
-func (r *RaiRpc) RpcUcheckedKeys(key, count string) map[string]interface{} {
+func (r *RaiRpc) RpcUcheckedKeys(key, count string) interface{} {
 	// key = '0000000000000000000000000000000000000000000000000000000000000000', count = '4096'
 	params := map[string]interface{}{"action": "unchecked_keys", "key": key, "count": count}
 	mapRes := r.callRpc(params)
-	unchecked := mapRes["unchecked"].(map[string]interface{})
-	for k, v := range unchecked {
-		val := v.(map[string]interface{})
-		json.Unmarshal([]byte(val["contents"].(string)), val["contents"])
-		unchecked[k] = val
+	unchecked := mapRes["unchecked"].(interface{})
+	for k, v := range unchecked.([]interface{}) {
+		var contents interface{}
+		json.Unmarshal([]byte(v.(map[string]interface{})["contents"].(string)), &contents)
+		unchecked.([]interface{})[k].(map[string]interface{})["contents"] = contents
 	}
 	return unchecked
 }
