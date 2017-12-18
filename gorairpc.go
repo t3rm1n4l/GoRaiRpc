@@ -104,7 +104,7 @@ func (r *RaiRpc) RpcAccountCreate(wallet string, work bool) string {
 }
 
 func (r *RaiRpc) RpcAccountInfo(account, unit string, representative, weight, pending bool) map[string]interface{} {
-	// account, unit = 'raw', representative = false, weight = false, pending = false
+	// account, unit = "raw", representative = false, weight = false, pending = false
 	params := map[string]interface{}{"action": "account_info", "account": account,
 		"representative": representative, "weight": weight, "pending": pending}
 	mapRes := r.callRpc(params)
@@ -119,7 +119,7 @@ func (r *RaiRpc) RpcAccountInfo(account, unit string, representative, weight, pe
 }
 
 func (r *RaiRpc) RpcAccountHistory(account, count string) string {
-	// count = '4096'
+	// count = "4096"
 	params := map[string]interface{}{"action": "account_history", "account": account, "count": count}
 	mapRes := r.callRpc(params)
 	return mapRes["history"].(string)
@@ -163,7 +163,7 @@ func (r *RaiRpc) RpcAccountRepresentative(account string) string {
 }
 
 func (r *RaiRpc) RpcAccountRepresentativeSet(wallet, account, representative, work string) string {
-	// work = '0000000000000000'
+	// work = "0000000000000000"
 	params := map[string]interface{}{"action": "account_representative_set", "wallet": wallet,
 		"account": account, "representative": representative, "work": work}
 	mapRes := r.callRpc(params)
@@ -171,7 +171,7 @@ func (r *RaiRpc) RpcAccountRepresentativeSet(wallet, account, representative, wo
 }
 
 func (r *RaiRpc) RpcAccountWeight(account, unit string) string {
-	// unit = 'raw'
+	// unit = "raw"
 	params := map[string]interface{}{"action": "account_weight", "account": account}
 	mapRes := r.callRpc(params)
 	accountWeight := r.ToUnit(mapRes["weight"].(string), "raw", unit)
@@ -198,7 +198,7 @@ func (r *RaiRpc) RpcAccountsFrontiers(accounts string) string {
 }
 
 func (r *RaiRpc) RpcAccountsPending(accounts []string, count string, threshold int, unit string, source bool) map[string]interface{} {
-	// accounts, count = '4096', threshold = 0, unit = 'raw', source = false
+	// accounts, count = "4096", threshold = 0, unit = "raw", source = false
 	params := map[string]interface{}{"action": "accounts_pending", "accounts": accounts, "count": count,
 		"threshold": threshold, "source": source}
 	mapRes := r.callRpc(params)
@@ -221,7 +221,7 @@ func (r *RaiRpc) RpcAccountsPending(accounts []string, count string, threshold i
 }
 
 func (r *RaiRpc) RpcAvailableSupply(unit string) string {
-	// unit = 'raw'
+	// unit = "raw"
 	params := map[string]interface{}{"action": "available_supply"}
 	mapRes := r.callRpc(params)
 	availableSupply := r.ToUnit(mapRes["available"].(string), "raw", unit)
@@ -249,20 +249,23 @@ func (r *RaiRpc) RpcBlocks(hashes []string) map[string]interface{} {
 }
 
 func (r *RaiRpc) RpcBlocksInfo(hashes []string, unit string, pending, source bool) map[string]interface{} {
-	// unit = 'raw', pending = false, source = false
+	// unit = "raw", pending = false, source = false
 	params := map[string]interface{}{"action": "blocks_info", "hashes": hashes, "pending": pending, "source": source}
 	mapRes := r.callRpc(params)
 	blocks := mapRes["blocks"].(map[string]interface{})
 	for k, v := range blocks {
-		val := v.(map[string]map[string]interface{})
-		json.Unmarshal([]byte(val["contents"]["amount"].(string)), val["contents"]["amount"])
-		blocks[k] = val
+		var val interface{}
+		json.Unmarshal([]byte(v.(map[string]interface{})["contents"].(string)), &val)
+		blocks[k].(map[string]interface{})["contents"] = val
+		if unit != "raw" {
+			v.(map[string]interface{})["amount"] = r.ToUnit(v.(map[string]interface{})["amount"].(string), "raw", unit)
+		}
 	}
 	return blocks
 }
 
 func (r *RaiRpc) RpcBlockAccount(hash string) string {
-	// unit = 'raw'
+	// unit = "raw"
 	params := map[string]interface{}{"action": "block_account", "hash": hash}
 	mapRes := r.callRpc(params)
 	return mapRes["account"].(string)
@@ -298,7 +301,7 @@ func (r *RaiRpc) RpcBlockCreate(params map[string]interface{}) map[string]interf
 }
 
 func (r *RaiRpc) RpcBootstrap(address, port string) string {
-	// address = '::ffff:138.201.94.249', port = '7075'
+	// address = "::ffff:138.201.94.249", port = "7075"
 	params := map[string]interface{}{"action": "bootstrap", "address": address, "port": port}
 	mapRes := r.callRpc(params)
 	return mapRes["success"].(string)
@@ -311,14 +314,14 @@ func (r *RaiRpc) RpcBootstrapAny() string {
 }
 
 func (r *RaiRpc) RpcChain(block, count string) string {
-	// count = '4096'
+	// count = "4096"
 	params := map[string]interface{}{"action": "chain", "block": block, "count": count}
 	mapRes := r.callRpc(params)
 	return mapRes["blocks"].(string)
 }
 
 func (r *RaiRpc) RpcDelegators(account, unit string) map[string]string {
-	// unit = 'raw'
+	// unit = "raw"
 	params := map[string]interface{}{"action": "delegators", "account": account}
 	mapRes := r.callRpc(params)
 	delegators := mapRes["delegators"].(map[string]string)
@@ -344,7 +347,7 @@ func (r *RaiRpc) RpcDeterministicKey(seed, index string) map[string]interface{} 
 }
 
 func (r *RaiRpc) RpcFrontiers(account, count string) string {
-	// account = 'xrb_1111111111111111111111111111111111111111111111111117353trpda', count = '1048576'
+	// account = "xrb_1111111111111111111111111111111111111111111111111117353trpda", count = "1048576"
 	params := map[string]interface{}{"action": "frontiers", "account": account, "count": count}
 	mapRes := r.callRpc(params)
 	return mapRes["frontiers"].(string)
@@ -357,7 +360,7 @@ func (r *RaiRpc) RpcFrontierCount() string {
 }
 
 func (r *RaiRpc) RpcHistory(hash, count string) string {
-	// count = '4096'
+	// count = "4096"
 	params := map[string]interface{}{"action": "history", "hash": hash, "count": count}
 	mapRes := r.callRpc(params)
 	return mapRes["amount"].(string)
@@ -401,7 +404,7 @@ func (r *RaiRpc) RpcRaiToRaw(amount string) string {
 }
 
 func (r *RaiRpc) RpcKeepalive(address, port string) map[string]interface{} {
-	// address = '::ffff:192.168.1.1', port = '7075'
+	// address = "::ffff:192.168.1.1", port = "7075"
 	params := map[string]interface{}{"action": "keepalive", "address": address, "port": port}
 	mapRes := r.callRpc(params)
 	return mapRes
@@ -420,7 +423,7 @@ func (r *RaiRpc) RpcKeyExpand(key string) map[string]interface{} {
 }
 
 func (r *RaiRpc) RpcLedger(account, count string, representative, weight, pending, sorting bool) string {
-	// account = 'xrb_1111111111111111111111111111111111111111111111111117353trpda', count = '1048576',
+	// account = "xrb_1111111111111111111111111111111111111111111111111117353trpda", count = "1048576",
 	// representative = false, weight = false, pending = false, sorting = false
 	params := map[string]interface{}{"action": "ledger", "account": account, "count": count,
 		"representative": representative, "weight": weight, "pending": pending, "sorting": sorting}
@@ -483,7 +486,7 @@ func (r *RaiRpc) RpcPeers() string {
 }
 
 func (r *RaiRpc) RpcPending(account, count string, threshold int, unit string, source bool) map[string]interface{} {
-	// count = '4096', threshold = 0, unit = 'raw', source = false
+	// count = "4096", threshold = 0, unit = "raw", source = false
 	params := map[string]interface{}{"action": "pending", "account": account,
 		"count": count, "threshold": threshold, "source": source}
 	mapRes := r.callRpc(params)
@@ -507,7 +510,7 @@ func (r *RaiRpc) RpcPendingExists(hash string) string {
 }
 
 func (r *RaiRpc) RpcReceive(wallet, account, block, work string) string {
-	// work = '0000000000000000'
+	// work = "0000000000000000"
 	params := map[string]interface{}{"action": "receive", "wallet": wallet,
 		"account": account, "block": block, "work": work}
 	mapRes := r.callRpc(params)
@@ -515,7 +518,7 @@ func (r *RaiRpc) RpcReceive(wallet, account, block, work string) string {
 }
 
 func (r *RaiRpc) RpcReceiveMinimum(unit string) string {
-	// unit = 'raw'
+	// unit = "raw"
 	params := map[string]interface{}{"action": "receive_minimum"}
 	mapRes := r.callRpc(params)
 	amount := r.ToUnit(mapRes["amount"].(string), "raw", unit)
@@ -523,7 +526,7 @@ func (r *RaiRpc) RpcReceiveMinimum(unit string) string {
 }
 
 func (r *RaiRpc) RpcReceiveMinimumSet(amount, unit string) string {
-	// unit = 'raw'
+	// unit = "raw"
 	rawAmount := r.ToUnit(amount, unit, "raw")
 	params := map[string]interface{}{"action": "receive_minimum_set", "amount": rawAmount}
 	mapRes := r.callRpc(params)
@@ -531,7 +534,7 @@ func (r *RaiRpc) RpcReceiveMinimumSet(amount, unit string) string {
 }
 
 func (r *RaiRpc) RpcRepresentatives(unit, count, sorting string) map[string]interface{} {
-	// unit = 'raw', count = '1048576', sorting = false
+	// unit = "raw", count = "1048576", sorting = false
 	params := map[string]interface{}{"action": "representatives", "count": count, "sorting": sorting}
 	mapRes := r.callRpc(params)
 	representatives := mapRes["representatives"].(map[string]interface{})
@@ -563,7 +566,7 @@ func (r *RaiRpc) RpcSearchPendingAll() string {
 }
 
 func (r *RaiRpc) RpcSend(wallet, source, destination, amount, unit string) string {
-	// unit = 'raw'
+	// unit = "raw"
 	rawAmount := r.ToUnit(amount, unit, "raw")
 	params := map[string]interface{}{"action": "send", "wallet": wallet, "source": source,
 		"destination": destination, "amount": rawAmount}
@@ -578,14 +581,14 @@ func (r *RaiRpc) RpcStop() string {
 }
 
 func (r *RaiRpc) RpcSuccessors(block, count string) string {
-	// count = '4096'
+	// count = "4096"
 	params := map[string]interface{}{"action": "successors", "block": block, "count": count}
 	mapRes := r.callRpc(params)
 	return mapRes["blocks"].(string)
 }
 
 func (r *RaiRpc) RpcUnchecked(count string) map[string]interface{} {
-	// count = '4096'
+	// count = "4096"
 	params := map[string]interface{}{"action": "unchecked", "count": count}
 	mapRes := r.callRpc(params)
 	blocks := mapRes["blocks"].(map[string]interface{})
@@ -610,7 +613,7 @@ func (r *RaiRpc) RpcUncheckedGet(hash string) string {
 }
 
 func (r *RaiRpc) RpcUcheckedKeys(key, count string) interface{} {
-	// key = '0000000000000000000000000000000000000000000000000000000000000000', count = '4096'
+	// key = "0000000000000000000000000000000000000000000000000000000000000000", count = "4096"
 	params := map[string]interface{}{"action": "unchecked_keys", "key": key, "count": count}
 	mapRes := r.callRpc(params)
 	unchecked := mapRes["unchecked"].(interface{})
@@ -641,7 +644,7 @@ func (r *RaiRpc) RpcWalletAdd(wallet, key string) string {
 }
 
 func (r *RaiRpc) RpcWalletBalanceTotal(wallet, unit string) map[string]interface{} {
-	// unit = 'raw'
+	// unit = "raw"
 	params := map[string]interface{}{"action": "wallet_balance_total", "wallet": wallet}
 	mapRes := r.callRpc(params)
 	walletBalanceTotals := map[string]interface{}{"balance": r.ToUnit(mapRes["balance"].(string), "raw", unit), "pending": r.ToUnit(mapRes["pending"].(string), "raw", unit)}
@@ -649,7 +652,7 @@ func (r *RaiRpc) RpcWalletBalanceTotal(wallet, unit string) map[string]interface
 }
 
 func (r *RaiRpc) RpcWalletBalances(wallet, unit string, threshold int) map[string]interface{} {
-	// unit = 'raw', threshold = 0
+	// unit = "raw", threshold = 0
 	if threshold != 0 {
 		threshold, _ = strconv.Atoi(r.ToUnit(strconv.Itoa(threshold), unit, "raw"))
 	}
@@ -702,7 +705,7 @@ func (r *RaiRpc) RpcWalletFrontiers(wallet string) string {
 }
 
 func (r *RaiRpc) RpcWalletPending(wallet, count string, threshold int, unit string, source bool) map[string]interface{} {
-	//count = '4096', threshold = 0, unit = 'raw', source = false
+	//count = "4096", threshold = 0, unit = "raw", source = false
 	if threshold != 0 {
 		threshold, _ = strconv.Atoi(r.ToUnit(strconv.Itoa(threshold), unit, "raw"))
 	}
@@ -781,7 +784,7 @@ func (r *RaiRpc) RpcWorkValidate(work, hash string) string {
 }
 
 func (r *RaiRpc) RpcWorkPeerAdd(address, port string) string {
-	// address = '::1', port = '7076'
+	// address = "::1", port = "7076"
 	params := map[string]interface{}{"action": "work_peer_add", "address": address, "port": port}
 	mapRes := r.callRpc(params)
 	return mapRes["success"].(string)

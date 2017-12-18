@@ -27,6 +27,9 @@ func main() {
 	fmt.Printf("-RpcBlock\n")
 	fmt.Println(rpc.RpcBlock("3BDCF72E7662DB9E2F38B15AF8FD1B633232928ED323C44E83D63573889E9BAE"))
 
+	fmt.Printf("-RpcBlocksInfo\n")
+	fmt.Println(rpc.RpcBlocksInfo([]string {"3BDCF72E7662DB9E2F38B15AF8FD1B633232928ED323C44E83D63573889E9BAE"}, "Mrai", false, false))
+
 	fmt.Printf("-RpcBlocks\n")
 	hashes := []string{"3BDCF72E7662DB9E2F38B15AF8FD1B633232928ED323C44E83D63573889E9BAE"}
 	showData(rpc.RpcBlocks(hashes))
