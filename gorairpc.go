@@ -716,8 +716,8 @@ func (r *RaiRpc) RpcWalletPending(wallet, count string, threshold int, unit stri
 	blocks := mapRes["blocks"].(map[string]interface{})
 	if source {
 		for k, v := range blocks {
-			val := v.(map[string]string)
-			val["amount"] = r.ToUnit(val["amount"], "raw", unit)
+			val := v.(map[string]interface{})
+			val["amount"] = r.ToUnit(val["amount"].(string), "raw", unit)
 			blocks[k] = val
 		}
 	} else if threshold != 0 {

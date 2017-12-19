@@ -3,7 +3,6 @@
 Go library for Raiblocks rpc commands
 
 ### WORK IN PROGRESS
-#### DO NOT USE IN PRODUCTION (YET)
 
 ### Installing
 * Go 1.8 or above
