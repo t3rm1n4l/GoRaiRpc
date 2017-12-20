@@ -2,8 +2,6 @@
 
 Go library for Raiblocks rpc commands
 
-### WORK IN PROGRESS
-
 ### Installing
 * Go 1.8 or above
 * Raiblock wallet 9.0 or above with rpc enabled in config.json
