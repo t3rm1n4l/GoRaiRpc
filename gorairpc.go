@@ -661,10 +661,10 @@ func (r *RaiRpc) RpcWalletBalances(wallet, unit string, threshold int) map[strin
 	mapRes := r.callRpc(params)
 	walletBalances := mapRes["balances"].(map[string]interface{})
 	for k, v := range walletBalances {
-		balance := r.ToUnit(v.(map[string]interface{})["account"].(map[string]interface{})["balance"].(string), "raw", unit)
-		pending := r.ToUnit(v.(map[string]interface{})["account"].(map[string]interface{})["pending"].(string), "raw", unit)
-		walletBalances[k].(map[string]interface{})["account"].(map[string]interface{})["balance"] = balance
-		walletBalances[k].(map[string]interface{})["account"].(map[string]interface{})["pending"] = pending
+		balance := r.ToUnit(v.(map[string]interface{})["balance"].(string), "raw", unit)
+		pending := r.ToUnit(v.(map[string]interface{})["pending"].(string), "raw", unit)
+		walletBalances[k].(map[string]interface{})["balance"] = balance
+		walletBalances[k].(map[string]interface{})["pending"] = pending
 	}
 	return walletBalances
 }
@@ -707,12 +707,16 @@ func (r *RaiRpc) RpcWalletFrontiers(wallet string) string {
 
 func (r *RaiRpc) RpcWalletPending(wallet, count string, threshold int, unit string, source bool) map[string]interface{} {
 	//count = "4096", threshold = 0, unit = "raw", source = false
+	thresholdStr := "0"
 	if threshold != 0 {
-		threshold, _ = strconv.Atoi(r.ToUnit(strconv.Itoa(threshold), unit, "raw"))
+		thresholdStr = r.ToUnit(strconv.Itoa(threshold), unit, "raw")
 	}
 	params := map[string]interface{}{"action": "wallet_pending", "wallet": wallet,
-		"count": count, "threshold": threshold, "source": source}
+		"count": count, "threshold": thresholdStr, "source": source}
 	mapRes := r.callRpc(params)
+	if mapRes["blocks"] == "" {
+		return nil
+	}
 	blocks := mapRes["blocks"].(map[string]interface{})
 	if source {
 		for k, v := range blocks {
