@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	xrpc "github.com/donutloop/GoRaiRpc"
+	xrpc "github.com/devmahno/GoRaiRpc"
 	"log"
 )
 
@@ -10,18 +10,14 @@ func main() {
 	rpc := xrpc.New()
 	fmt.Printf("Begin\n")
 
-	availableSupply, err := rpc.RpcAvailableSupply("raw")
-
-	fmt.Printf("AvailableSupply: %s\n", availableSupply)
-
-	data, err := rpc.RpcVersion()
+	version, err := rpc.Version()
 	if err != nil {
 		log.Println(err)
 	}
-	showData(data)
+	fmt.Println(fmt.Sprintf("%#v", version))
 
 	fmt.Printf("-\n")
-	data, err = rpc.RpcAccountInfo("xrb_3cwsajkzdycgg6k4q7zea68t4h5tu3ui59rdriurtjjem7rrjqtoixu473bt", "Mrai", true, true, true)
+	data, err := rpc.RpcAccountInfo("xrb_3cwsajkzdycgg6k4q7zea68t4h5tu3ui59rdriurtjjem7rrjqtoixu473bt", "Mrai", true, true, true)
 	if err != nil {
 		log.Println(err)
 	}

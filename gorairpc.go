@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 // Struct
@@ -83,9 +81,12 @@ func (r *RaiRpc) ToUnit(input, inputUnit, outputUnit string) string {
 	return val.String()
 }
 
-func (r *RaiRpc) RpcAccountBalance(account string) (map[string]interface{}, error) {
-	params := map[string]interface{}{"action": "account_balance", "account": account}
-	return r.callRpc(params)
+func (r *RaiRpc) AccountBalance(account string) (*AccountBalance, error) {
+	resp := new(AccountBalance)
+	if err := r.call(AccountBalanceAction{Action: Action{Name: "account_balance"}, Account: account}, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (r *RaiRpc) RpcAccountBlockCount(account string) (string, error) {
@@ -124,32 +125,32 @@ func (r *RaiRpc) RpcAccountInfo(account, unit string, representative, weight, pe
 	return mapRes, nil
 }
 
-func (r *RaiRpc) RpcAccountHistory(account, count string) (string, error) {
-	// count = "4096"
-	params := map[string]interface{}{"action": "account_history", "account": account, "count": count}
-	mapRes, err := r.callRpc(params)
+// todo is count always a number?
+func (r *RaiRpc) AccountHistory(account, count string) (string, error) {
+	resp := new(AccountHistory)
+	err := r.call(AccountHistoryAction{Action:Action{Name:"account_history"}, Count: count, Account:account}, resp)
 	if err != nil {
 		return "", err
 	}
-	return mapRes["history"].(string), nil
+	return resp.History, nil
 }
 
-func (r *RaiRpc) RpcAccountGet(key string) (string, error) {
-	params := map[string]interface{}{"action": "account_get", "key": key}
-	mapRes, err := r.callRpc(params)
+func (r *RaiRpc) AccountGet(key string) (string, error) {
+	resp := new(AccountGet)
+	err := r.call(AccountGetAction{Action:Action{Name:"account_get"}, Key:key}, resp)
 	if err != nil {
 		return "", err
 	}
-	return mapRes["account"].(string), nil
+	return resp.Account, nil
 }
 
-func (r *RaiRpc) RpcAccountKey(account string) (string, error) {
-	params := map[string]interface{}{"action": "account_key", "account": account}
-	mapRes, err := r.callRpc(params)
+func (r *RaiRpc) AccountKey(account string) (string, error) {
+	resp := new(AccountKey)
+	err := r.call(AccountKeyAction{Action: Action{Name:"account_key"}, Account:account}, resp)
 	if err != nil {
 		return "", err
 	}
-	return mapRes["key"].(string), nil
+	return resp.Key, nil
 }
 
 func (r *RaiRpc) RpcAccountList(wallet string) (string, error) {
@@ -266,15 +267,14 @@ func (r *RaiRpc) RpcAccountsPending(accounts []string, count string, threshold i
 	return blocks, nil
 }
 
-func (r *RaiRpc) RpcAvailableSupply(unit string) (string, error) {
+func (r *RaiRpc) AvailableSupply() (*AvailableSupply, error) {
 	// unit = "raw"
-	params := map[string]interface{}{"action": "available_supply"}
-	mapRes, err := r.callRpc(params)
+	data := new(AvailableSupply)
+	err := r.call(Action{Name: "available_supply"}, data)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	availableSupply := r.ToUnit(mapRes["available"].(string), "raw", unit)
-	return availableSupply, err
+	return data, err
 }
 
 func (r *RaiRpc) RpcBlock(hash string) (map[string]interface{}, error) {
@@ -831,13 +831,13 @@ func (r *RaiRpc) RpcValidateAccountNumber(account string) (string, error) {
 	return mapRes["valid"].(string), nil
 }
 
-func (r *RaiRpc) RpcVersion() (map[string]interface{}, error) {
-	params := map[string]interface{}{"action": "version"}
-	mapRes, err := r.callRpc(params)
+func (r *RaiRpc) Version() (*Version, error) {
+	resp := new(Version)
+	err := r.call(Action{Name:"version"}, resp)
 	if err != nil {
 		return nil, err
 	}
-	return mapRes, nil
+	return resp, nil
 }
 
 func (r *RaiRpc) RpcWalletAdd(wallet, key string) (string, error) {
@@ -1094,4 +1094,27 @@ func (r *RaiRpc) callRpc(params map[string]interface{}) (map[string]interface{},
 		return nil, fmt.Errorf("error unmarschaling response body (%v)", err)
 	}
 	return data, nil
+}
+
+func (r *RaiRpc) call(params interface{}, dest interface{}) error {
+	// Prepare json POST request
+	body, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post(r.url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("error sending request (%v)", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("rai blockes node responded with status code (%d)", resp.StatusCode)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&dest); err != nil {
+		return fmt.Errorf("error unmarschaling response body (%v)", err)
+	}
+	return nil
 }
