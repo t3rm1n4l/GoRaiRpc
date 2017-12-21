@@ -65,7 +65,7 @@ _testmain.go
 atlassian-ide-plugin.xml
 
 # Crashlytics plugin (for Android Studio and IntelliJ)
-com_crashlytics_export_strings.xml
+com_crashlytics_export_(string, error)s.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
