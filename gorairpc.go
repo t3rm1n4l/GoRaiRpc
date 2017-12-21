@@ -1,14 +1,14 @@
 package gorairpc
 
 import (
-	"fmt"
+	"bytes"
 	"encoding/json"
-	"net/http"
-	"strings"
+	"fmt"
 	"io/ioutil"
 	"math/big"
+	"net/http"
 	"strconv"
-	"bytes"
+	"strings"
 )
 
 // Struct
@@ -273,13 +273,13 @@ func (r *RaiRpc) RpcAvailableSupply(unit string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	availableSupply := r.ToUnit(mapRes["available"].(string),  "raw", unit)
+	availableSupply := r.ToUnit(mapRes["available"].(string), "raw", unit)
 	return availableSupply, err
 }
 
 func (r *RaiRpc) RpcBlock(hash string) (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "block", "hash": hash}
-	mapRes,err := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (r *RaiRpc) RpcBlocks(hashes []string) (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "blocks", "hashes": hashes}
 	mapRes, err := r.callRpc(params)
 	if err != nil {
-		return nil , err
+		return nil, err
 	}
 	blocks := make(map[string]interface{})
 	for k, v := range mapRes["blocks"].(map[string]interface{}) {
@@ -1009,7 +1009,7 @@ func (r *RaiRpc) RpcWorkCancel(hash string) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return  mapRes, nil
+	return mapRes, nil
 }
 
 func (r *RaiRpc) RpcWorkGenerate(hash string) (string, error) {
@@ -1069,7 +1069,7 @@ func (r *RaiRpc) RpcWorkPeers() (string, error) {
 
 func (r *RaiRpc) RpcWorkPeersClear() (string, error) {
 	params := map[string]interface{}{"action": "work_peers_clear"}
-	mapRes, err  := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
 	if err != nil {
 		return "", err
 	}
@@ -1087,18 +1087,11 @@ func (r *RaiRpc) callRpc(params map[string]interface{}) (map[string]interface{},
 	if err != nil {
 		return nil, fmt.Errorf("error sending request (%v)", err)
 	}
+	defer res.Body.Close()
 
-	var byteTab []byte
-	byteTab, err = ioutil.ReadAll(res.Body)
-	res.Body.Close()
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body (%v)", err)
-	}
-
-	var dataMap map[string]interface{}
-	err = json.Unmarshal(byteTab, &dataMap)
-	if err != nil {
+	data := make(map[string]interface{})
+	if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
 		return nil, fmt.Errorf("error unmarschaling response body (%v)", err)
 	}
-	return dataMap, nil
+	return data, nil
 }

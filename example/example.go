@@ -12,7 +12,7 @@ func main() {
 
 	availableSupply, err := rpc.RpcAvailableSupply("raw")
 
-	fmt.Printf("AvailableSupply: %s\n",availableSupply)
+	fmt.Printf("AvailableSupply: %s\n", availableSupply)
 
 	data, err := rpc.RpcVersion()
 	if err != nil {
@@ -27,16 +27,14 @@ func main() {
 	}
 	showData(data)
 
-
 	fmt.Printf("-RpcAccountsPending\n")
 	//accounts, count = '4096', threshold = 0, unit = 'raw', source = false
 	data, err = rpc.RpcAccountsPending([]string{"xrb_1111111111111111111111111111111111111111111111111117353trpda",
-	"xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3"}, "1", 1, "Mrai", true)
+		"xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3"}, "1", 1, "Mrai", true)
 	if err != nil {
 		log.Println(err)
 	}
 	showData(data)
-
 
 	fmt.Printf("-RpcPending\n")
 	//account, count = '4096', threshold = 0, unit = 'raw', source = false
@@ -50,7 +48,7 @@ func main() {
 	fmt.Println(rpc.RpcBlock("3BDCF72E7662DB9E2F38B15AF8FD1B633232928ED323C44E83D63573889E9BAE"))
 
 	fmt.Printf("-RpcBlocksInfo\n")
-	fmt.Println(rpc.RpcBlocksInfo([]string {"3BDCF72E7662DB9E2F38B15AF8FD1B633232928ED323C44E83D63573889E9BAE"}, "Mrai", false, true))
+	fmt.Println(rpc.RpcBlocksInfo([]string{"3BDCF72E7662DB9E2F38B15AF8FD1B633232928ED323C44E83D63573889E9BAE"}, "Mrai", false, true))
 
 	fmt.Printf("-RpcBlocks\n")
 	hashes := []string{"3BDCF72E7662DB9E2F38B15AF8FD1B633232928ED323C44E83D63573889E9BAE"}
