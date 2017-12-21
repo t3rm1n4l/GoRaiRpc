@@ -17,17 +17,16 @@ type RaiRpc struct {
 }
 
 // RaiRpc constructor  with default url
-func NewRaiRpc() RaiRpc {
-	rb := RaiRpc{"http://localhost:7076"}
+func New(url ...string) RaiRpc {
+	rb := RaiRpc{
+		url: "http://localhost:7076",
+	}
+
+	if len(url) != 0 && url[0] != "" {
+		rb.url = url[0]
+	}
+
 	return rb
-}
-
-func (r *RaiRpc) GetUrl() string {
-	return r.url
-}
-
-func (r *RaiRpc) SetUrl(url string) {
-	r.url = url
 }
 
 func (r *RaiRpc) ToUnit(input, inputUnit, outputUnit string) string {
