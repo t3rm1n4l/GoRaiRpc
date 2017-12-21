@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"strconv"
+	"bytes"
 )
 
 // Struct
@@ -1082,7 +1083,7 @@ func (r *RaiRpc) callRpc(params map[string]interface{}) (map[string]interface{},
 		return nil, err
 	}
 
-	res, err := http.Post(r.url, "application/json", strings.NewReader(string(body)))
+	res, err := http.Post(r.url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("error sending request (%v)", err)
 	}
