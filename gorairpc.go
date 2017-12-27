@@ -1,13 +1,11 @@
 package gorairpc
 
 import (
-	"fmt"
+	"bytes"
 	"encoding/json"
-	"net/http"
-	"log"
-	"strings"
-	"io/ioutil"
+	"fmt"
 	"math/big"
+	"net/http"
 	"strconv"
 )
 
@@ -17,17 +15,16 @@ type RaiRpc struct {
 }
 
 // RaiRpc constructor  with default url
-func NewRaiRpc() RaiRpc {
-	rb := RaiRpc{"http://localhost:7076"}
+func New(url ...string) RaiRpc {
+	rb := RaiRpc{
+		url: "http://localhost:7076",
+	}
+
+	if len(url) != 0 && url[0] != "" {
+		rb.url = url[0]
+	}
+
 	return rb
-}
-
-func (r *RaiRpc) GetUrl() string {
-	return r.url
-}
-
-func (r *RaiRpc) SetUrl(url string) {
-	r.url = url
 }
 
 func (r *RaiRpc) ToUnit(input, inputUnit, outputUnit string) string {
@@ -84,30 +81,40 @@ func (r *RaiRpc) ToUnit(input, inputUnit, outputUnit string) string {
 	return val.String()
 }
 
-func (r *RaiRpc) RpcAccountBalance(account string) map[string]interface{} {
-	params := map[string]interface{}{"action": "account_balance", "account": account}
-	mapRes := r.callRpc(params)
-	return mapRes
+func (r *RaiRpc) AccountBalance(account string) (*AccountBalance, error) {
+	resp := new(AccountBalance)
+	if err := r.call(AccountBalanceAction{Action: Action{Name: "account_balance"}, Account: account}, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
-func (r *RaiRpc) RpcAccountBlockCount(account string) string {
+func (r *RaiRpc) RpcAccountBlockCount(account string) (string, error) {
 	params := map[string]interface{}{"action": "account_block_count", "account": account}
-	mapRes := r.callRpc(params)
-	return mapRes["block_count"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["block_count"].(string), nil
 }
 
-func (r *RaiRpc) RpcAccountCreate(wallet string, work bool) string {
-	// work = true
+func (r *RaiRpc) RpcAccountCreate(wallet string, work bool) (string, error) {
 	params := map[string]interface{}{"action": "account_create", "wallet": wallet, "work": work}
-	mapRes := r.callRpc(params)
-	return mapRes["account"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["account"].(string), nil
 }
 
-func (r *RaiRpc) RpcAccountInfo(account, unit string, representative, weight, pending bool) map[string]interface{} {
-	// account, unit = "raw", representative = false, weight = false, pending = false
+func (r *RaiRpc) RpcAccountInfo(account, unit string, representative, weight, pending bool) (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "account_info", "account": account,
 		"representative": representative, "weight": weight, "pending": pending}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
+
 	mapRes["balance"] = r.ToUnit(mapRes["balance"].(string), "raw", unit)
 	if weight {
 		mapRes["weight"] = r.ToUnit(mapRes["weight"].(string), "raw", unit)
@@ -115,93 +122,133 @@ func (r *RaiRpc) RpcAccountInfo(account, unit string, representative, weight, pe
 	if pending {
 		mapRes["pending"] = r.ToUnit(mapRes["pending"].(string), "raw", unit)
 	}
-	return mapRes
+	return mapRes, nil
 }
 
-func (r *RaiRpc) RpcAccountHistory(account, count string) string {
-	// count = "4096"
-	params := map[string]interface{}{"action": "account_history", "account": account, "count": count}
-	mapRes := r.callRpc(params)
-	return mapRes["history"].(string)
+// todo is count always a number?
+func (r *RaiRpc) AccountHistory(account, count string) (string, error) {
+	resp := new(AccountHistory)
+	err := r.call(AccountHistoryAction{Action:Action{Name:"account_history"}, Count: count, Account:account}, resp)
+	if err != nil {
+		return "", err
+	}
+	return resp.History, nil
 }
 
-func (r *RaiRpc) RpcAccountGet(key string) string {
-	params := map[string]interface{}{"action": "account_get", "key": key}
-	mapRes := r.callRpc(params)
-	return mapRes["account"].(string)
+func (r *RaiRpc) AccountGet(key string) (string, error) {
+	resp := new(AccountGet)
+	err := r.call(AccountGetAction{Action:Action{Name:"account_get"}, Key:key}, resp)
+	if err != nil {
+		return "", err
+	}
+	return resp.Account, nil
 }
 
-func (r *RaiRpc) RpcAccountKey(account string) string {
-	params := map[string]interface{}{"action": "account_key", "account": account}
-	mapRes := r.callRpc(params)
-	return mapRes["key"].(string)
+func (r *RaiRpc) AccountKey(account string) (string, error) {
+	resp := new(AccountKey)
+	err := r.call(AccountKeyAction{Action: Action{Name:"account_key"}, Account:account}, resp)
+	if err != nil {
+		return "", err
+	}
+	return resp.Key, nil
 }
 
-func (r *RaiRpc) RpcAccountList(wallet string) string {
+func (r *RaiRpc) RpcAccountList(wallet string) (string, error) {
 	params := map[string]interface{}{"action": "account_list", "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes["accounts"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["accounts"].(string), nil
 }
 
-func (r *RaiRpc) RpcAccountMove(wallet, source, accounts string) string {
+func (r *RaiRpc) RpcAccountMove(wallet, source, accounts string) (string, error) {
 	params := map[string]interface{}{"action": "account_move", "wallet": wallet,
 		"source": source, "accounts": accounts}
-	mapRes := r.callRpc(params)
-	return mapRes["moved"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+
+	return mapRes["moved"].(string), nil
 }
 
-func (r *RaiRpc) RpcAccountRemove(wallet, account string) string {
+func (r *RaiRpc) RpcAccountRemove(wallet, account string) (string, error) {
 	params := map[string]interface{}{"action": "account_remove", "wallet": wallet, "account": account}
-	mapRes := r.callRpc(params)
-	return mapRes["removed"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["removed"].(string), nil
 }
 
-func (r *RaiRpc) RpcAccountRepresentative(account string) string {
+func (r *RaiRpc) RpcAccountRepresentative(account string) (string, error) {
 	params := map[string]interface{}{"action": "account_representative", "account": account}
-	mapRes := r.callRpc(params)
-	return mapRes["representative"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["representative"].(string), nil
 }
 
-func (r *RaiRpc) RpcAccountRepresentativeSet(wallet, account, representative, work string) string {
+func (r *RaiRpc) RpcAccountRepresentativeSet(wallet, account, representative, work string) (string, error) {
 	// work = "0000000000000000"
 	params := map[string]interface{}{"action": "account_representative_set", "wallet": wallet,
 		"account": account, "representative": representative, "work": work}
-	mapRes := r.callRpc(params)
-	return mapRes["block"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["block"].(string), nil
 }
 
-func (r *RaiRpc) RpcAccountWeight(account, unit string) string {
+func (r *RaiRpc) RpcAccountWeight(account, unit string) (string, error) {
 	// unit = "raw"
 	params := map[string]interface{}{"action": "account_weight", "account": account}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
 	accountWeight := r.ToUnit(mapRes["weight"].(string), "raw", unit)
-	return accountWeight
+	return accountWeight, nil
 }
 
-func (r *RaiRpc) RpcAccountsBalances(accounts string) string {
+func (r *RaiRpc) RpcAccountsBalances(accounts string) (string, error) {
 	params := map[string]interface{}{"action": "accounts_balances", "accounts": accounts}
-	mapRes := r.callRpc(params)
-	return mapRes["balances"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["balances"].(string), nil
 }
 
-func (r *RaiRpc) RpcAccountsCreate(wallet, count, work string) string {
+func (r *RaiRpc) RpcAccountsCreate(wallet, count, work string) (string, error) {
 	// wallet, count = 1, work = true
 	params := map[string]interface{}{"action": "accounts_create", "wallet": wallet, "count": count, "work": work}
-	mapRes := r.callRpc(params)
-	return mapRes["accounts"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["accounts"].(string), nil
 }
 
-func (r *RaiRpc) RpcAccountsFrontiers(accounts string) string {
+func (r *RaiRpc) RpcAccountsFrontiers(accounts string) (string, error) {
 	params := map[string]interface{}{"action": "accounts_frontiers", "accounts": accounts}
-	mapRes := r.callRpc(params)
-	return mapRes["frontiers"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["frontiers"].(string), nil
 }
 
-func (r *RaiRpc) RpcAccountsPending(accounts []string, count string, threshold int, unit string, source bool) map[string]interface{} {
+func (r *RaiRpc) RpcAccountsPending(accounts []string, count string, threshold int, unit string, source bool) (map[string]interface{}, error) {
 	// accounts, count = "4096", threshold = 0, unit = "raw", source = false
 	params := map[string]interface{}{"action": "accounts_pending", "accounts": accounts, "count": count,
 		"threshold": threshold, "source": source}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
 
 	blocks := mapRes["blocks"].(map[string]interface{})
 	if source {
@@ -217,70 +264,88 @@ func (r *RaiRpc) RpcAccountsPending(accounts []string, count string, threshold i
 			}
 		}
 	}
-	return blocks
+	return blocks, nil
 }
 
-func (r *RaiRpc) RpcAvailableSupply(unit string) string {
+func (r *RaiRpc) AvailableSupply() (*AvailableSupply, error) {
 	// unit = "raw"
-	params := map[string]interface{}{"action": "available_supply"}
-	mapRes := r.callRpc(params)
-	availableSupply := r.ToUnit(mapRes["available"].(string), "raw", unit)
-	return availableSupply
+	data := new(AvailableSupply)
+	err := r.call(Action{Name: "available_supply"}, data)
+	if err != nil {
+		return nil, err
+	}
+	return data, err
 }
 
-func (r *RaiRpc) RpcBlock(hash string) map[string]interface{} {
+func (r *RaiRpc) RpcBlock(hash string) (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "block", "hash": hash}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
 	var block map[string]interface{}
-	json.Unmarshal([]byte(mapRes["contents"].(string)), &block)
-	return block
+	if err := json.Unmarshal([]byte(mapRes["contents"].(string)), &block); err != nil {
+		return nil, err
+	}
+	return block, nil
 }
 
-func (r *RaiRpc) RpcBlocks(hashes []string) map[string]interface{} {
+func (r *RaiRpc) RpcBlocks(hashes []string) (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "blocks", "hashes": hashes}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
 	blocks := make(map[string]interface{})
 	for k, v := range mapRes["blocks"].(map[string]interface{}) {
 		var val interface{}
-		json.Unmarshal([]byte(v.(string)), &val)
+		if err := json.Unmarshal([]byte(v.(string)), &val); err != nil {
+			return nil, err
+		}
 		blocks[k] = val
 	}
-	return blocks
+	return blocks, nil
 }
 
-func (r *RaiRpc) RpcBlocksInfo(hashes []string, unit string, pending, source bool) map[string]interface{} {
+func (r *RaiRpc) RpcBlocksInfo(hashes []string, unit string, pending, source bool) (map[string]interface{}, error) {
 	// unit = "raw", pending = false, source = false
 	params := map[string]interface{}{"action": "blocks_info", "hashes": hashes, "pending": pending, "source": source}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
 	blocks := mapRes["blocks"].(map[string]interface{})
 	for k, v := range blocks {
 		var val interface{}
-		json.Unmarshal([]byte(v.(map[string]interface{})["contents"].(string)), &val)
+		if err := json.Unmarshal([]byte(v.(map[string]interface{})["contents"].(string)), &val); err != nil {
+			return nil, err
+		}
 		blocks[k].(map[string]interface{})["contents"] = val
 		if unit != "raw" {
 			v.(map[string]interface{})["amount"] = r.ToUnit(v.(map[string]interface{})["amount"].(string), "raw", unit)
 		}
 	}
-	return blocks
+	return blocks, nil
 }
 
-func (r *RaiRpc) RpcBlockAccount(hash string) string {
+func (r *RaiRpc) RpcBlockAccount(hash string) (string, error) {
 	// unit = "raw"
 	params := map[string]interface{}{"action": "block_account", "hash": hash}
-	mapRes := r.callRpc(params)
-	return mapRes["account"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", nil
+	}
+	return mapRes["account"].(string), nil
 }
 
-func (r *RaiRpc) RpcBlockCount() map[string]interface{} {
+func (r *RaiRpc) RpcBlockCount() (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "block_count"}
-	mapRes := r.callRpc(params)
-	return mapRes
+	return r.callRpc(params)
 }
 
-func (r *RaiRpc) RpcBlockCountType() map[string]interface{} {
+func (r *RaiRpc) RpcBlockCountType() (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "block_count_type"}
-	mapRes := r.callRpc(params)
-	return mapRes
+	return r.callRpc(params)
 }
 
 /*	Sample block creation:
@@ -292,204 +357,286 @@ func (r *RaiRpc) RpcBlockCountType() map[string]interface{} {
 	blockData["source"] = "19D3D919475DEED4696B5D13018151D1AF88B2BD3BCFF048B45031C1F36D1858"
 	block := rpc.RpcBlockCreate(blockData)
 */
-func (r *RaiRpc) RpcBlockCreate(params map[string]interface{}) map[string]interface{} {
+func (r *RaiRpc) RpcBlockCreate(params map[string]interface{}) (map[string]interface{}, error) {
 	params["action"] = "block_create"
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
+
 	var block map[string]interface{}
-	json.Unmarshal([]byte(mapRes["block"].(string)), &block)
-	return block
+	if err := json.Unmarshal([]byte(mapRes["block"].(string)), &block); err != nil {
+		return nil, err
+	}
+
+	return block, nil
 }
 
-func (r *RaiRpc) RpcBootstrap(address, port string) string {
+func (r *RaiRpc) RpcBootstrap(address, port string) (string, error) {
 	// address = "::ffff:138.201.94.249", port = "7075"
 	params := map[string]interface{}{"action": "bootstrap", "address": address, "port": port}
-	mapRes := r.callRpc(params)
-	return mapRes["success"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+
+	return mapRes["success"].(string), nil
 }
 
-func (r *RaiRpc) RpcBootstrapAny() string {
+func (r *RaiRpc) RpcBootstrapAny() (string, error) {
 	params := map[string]interface{}{"action": "bootstrap_any"}
-	mapRes := r.callRpc(params)
-	return mapRes["success"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["success"].(string), nil
 }
 
-func (r *RaiRpc) RpcChain(block, count string) string {
+func (r *RaiRpc) RpcChain(block, count string) (string, error) {
 	// count = "4096"
 	params := map[string]interface{}{"action": "chain", "block": block, "count": count}
-	mapRes := r.callRpc(params)
-	return mapRes["blocks"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["blocks"].(string), nil
 }
 
-func (r *RaiRpc) RpcDelegators(account, unit string) map[string]string {
+func (r *RaiRpc) RpcDelegators(account, unit string) (map[string]string, error) {
 	// unit = "raw"
 	params := map[string]interface{}{"action": "delegators", "account": account}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
+
 	delegators := mapRes["delegators"].(map[string]string)
 	if unit != "raw" {
 		for k, v := range delegators {
 			delegators[k] = r.ToUnit(v, "raw", unit)
 		}
 	}
-	return delegators
+	return delegators, nil
 }
 
-func (r *RaiRpc) RpcDelegatorsCount(account string) string {
+func (r *RaiRpc) RpcDelegatorsCount(account string) (string, error) {
 	params := map[string]interface{}{"action": "delegators_count", "account": account}
-	mapRes := r.callRpc(params)
-	return mapRes["count"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["count"].(string), nil
 }
 
-func (r *RaiRpc) RpcDeterministicKey(seed, index string) map[string]interface{} {
+func (r *RaiRpc) RpcDeterministicKey(seed, index string) (map[string]interface{}, error) {
 	// index = 0
 	params := map[string]interface{}{"action": "deterministic_key", "seed": seed, "index": index}
-	mapRes := r.callRpc(params)
-	return mapRes
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
+	return mapRes, nil
 }
 
-func (r *RaiRpc) RpcFrontiers(account, count string) string {
+func (r *RaiRpc) RpcFrontiers(account, count string) (string, error) {
 	// account = "xrb_1111111111111111111111111111111111111111111111111117353trpda", count = "1048576"
 	params := map[string]interface{}{"action": "frontiers", "account": account, "count": count}
-	mapRes := r.callRpc(params)
-	return mapRes["frontiers"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["frontiers"].(string), nil
 }
 
-func (r *RaiRpc) RpcFrontierCount() string {
+func (r *RaiRpc) RpcFrontierCount() (string, error) {
 	params := map[string]interface{}{"action": "frontier_count"}
-	mapRes := r.callRpc(params)
-	return mapRes["count"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["count"].(string), nil
 }
 
-func (r *RaiRpc) RpcHistory(hash, count string) string {
+func (r *RaiRpc) RpcHistory(hash, count string) (string, error) {
 	// count = "4096"
 	params := map[string]interface{}{"action": "history", "hash": hash, "count": count}
-	mapRes := r.callRpc(params)
-	return mapRes["amount"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["amount"].(string), nil
 }
 
-func (r *RaiRpc) RpcMraiFromRaw(amount string) string {
+func (r *RaiRpc) RpcMraiFromRaw(amount string) (string, error) {
 	params := map[string]interface{}{"action": "mrai_from_raw", "amount": amount}
-	mapRes := r.callRpc(params)
-	return mapRes["amount"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["amount"].(string), nil
 }
 
 // Use ToUnit instead of this function
-func (r *RaiRpc) RpcMraiToRaw(amount string) string {
+func (r *RaiRpc) RpcMraiToRaw(amount string) (string, error) {
 	params := map[string]interface{}{"action": "mrai_to_raw", "amount": amount}
-	mapRes := r.callRpc(params)
-	return mapRes["amount"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["amount"].(string), nil
 }
 
-func (r *RaiRpc) RpcKraiFromRaw(amount string) string {
+func (r *RaiRpc) RpcKraiFromRaw(amount string) (string, error) {
 	params := map[string]interface{}{"action": "krai_from_raw", "amount": amount}
-	mapRes := r.callRpc(params)
-	return mapRes["amount"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["amount"].(string), nil
 }
 
-func (r *RaiRpc) RpcKraiToRaw(amount string) string {
+func (r *RaiRpc) RpcKraiToRaw(amount string) (string, error) {
 	params := map[string]interface{}{"action": "krai_to_raw", "amount": amount}
-	mapRes := r.callRpc(params)
-	return mapRes["amount"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["amount"].(string), nil
 }
 
-func (r *RaiRpc) RpcRaiFromRaw(amount string) string {
+func (r *RaiRpc) RpcRaiFromRaw(amount string) (string, error) {
 	params := map[string]interface{}{"action": "rai_from_raw", "amount": amount}
-	mapRes := r.callRpc(params)
-	return mapRes["amount"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["amount"].(string), nil
 }
 
-func (r *RaiRpc) RpcRaiToRaw(amount string) string {
+func (r *RaiRpc) RpcRaiToRaw(amount string) (string, error) {
 	params := map[string]interface{}{"action": "rai_to_raw", "amount": amount}
-	mapRes := r.callRpc(params)
-	return mapRes["amount"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["amount"].(string), nil
 }
 
-func (r *RaiRpc) RpcKeepalive(address, port string) map[string]interface{} {
+func (r *RaiRpc) RpcKeepalive(address, port string) (map[string]interface{}, error) {
 	// address = "::ffff:192.168.1.1", port = "7075"
 	params := map[string]interface{}{"action": "keepalive", "address": address, "port": port}
-	mapRes := r.callRpc(params)
-	return mapRes
+	return r.callRpc(params)
 }
 
-func (r *RaiRpc) RpcKeyCreate() map[string]interface{} {
+func (r *RaiRpc) RpcKeyCreate() (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "key_create"}
-	mapRes := r.callRpc(params)
-	return mapRes
+	return r.callRpc(params)
+
 }
 
-func (r *RaiRpc) RpcKeyExpand(key string) map[string]interface{} {
+func (r *RaiRpc) RpcKeyExpand(key string) (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "key_expand", "key": key}
-	mapRes := r.callRpc(params)
-	return mapRes
+	return r.callRpc(params)
 }
 
-func (r *RaiRpc) RpcLedger(account, count string, representative, weight, pending, sorting bool) string {
+func (r *RaiRpc) RpcLedger(account, count string, representative, weight, pending, sorting bool) (string, error) {
 	// account = "xrb_1111111111111111111111111111111111111111111111111117353trpda", count = "1048576",
 	// representative = false, weight = false, pending = false, sorting = false
 	params := map[string]interface{}{"action": "ledger", "account": account, "count": count,
 		"representative": representative, "weight": weight, "pending": pending, "sorting": sorting}
-	mapRes := r.callRpc(params)
-	return mapRes["accounts"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["accounts"].(string), nil
 }
 
-func (r *RaiRpc) RpcPasswordChange(wallet, password string) string {
+func (r *RaiRpc) RpcPasswordChange(wallet, password string) (string, error) {
 	params := map[string]interface{}{"action": "password_change", "wallet": wallet, "password": password}
-	mapRes := r.callRpc(params)
-	return mapRes["changed"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["changed"].(string), nil
 }
 
-func (r *RaiRpc) RpcPasswordEnter(wallet, password string) string {
+func (r *RaiRpc) RpcPasswordEnter(wallet, password string) (string, error) {
 	params := map[string]interface{}{"action": "password_enter", "wallet": wallet, "password": password}
-	mapRes := r.callRpc(params)
-	return mapRes["valid"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["valid"].(string), nil
 }
 
-func (r *RaiRpc) RpcPasswordValid(wallet, password string) string {
+func (r *RaiRpc) RpcPasswordValid(wallet, password string) (string, error) {
 	params := map[string]interface{}{"action": "password_valid", "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes["valid"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["valid"].(string), nil
 }
 
-func (r *RaiRpc) RpcPaymentBegin(wallet, password string) string {
+func (r *RaiRpc) RpcPaymentBegin(wallet, password string) (string, error) {
 	params := map[string]interface{}{"action": "payment_begin", "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes["account"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["account"].(string), nil
 }
 
-func (r *RaiRpc) RpcPaymentInit(wallet string) string {
+func (r *RaiRpc) RpcPaymentInit(wallet string) (string, error) {
 	params := map[string]interface{}{"action": "payment_init", "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes["status"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["status"].(string), nil
 }
 
-func (r *RaiRpc) RpcPaymentEnd(account, wallet string) map[string]interface{} {
+func (r *RaiRpc) RpcPaymentEnd(account, wallet string) (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "payment_end", "account": account, "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes
+	return r.callRpc(params)
 }
 
-func (r *RaiRpc) RpcPaymentWait(account, amount, timeout string) string {
+func (r *RaiRpc) RpcPaymentWait(account, amount, timeout string) (string, error) {
 	params := map[string]interface{}{"action": "payment_wait", "account": account, "amount": amount, "timeout": timeout}
-	mapRes := r.callRpc(params)
-	return mapRes["status"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+
+	return mapRes["status"].(string), nil
 }
 
-func (r *RaiRpc) RpcProcess(block string) string {
+func (r *RaiRpc) RpcProcess(block string) (string, error) {
 	params := map[string]interface{}{"action": "process", "block": block}
-	mapRes := r.callRpc(params)
-	return mapRes["hash"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["hash"].(string), nil
 }
 
-func (r *RaiRpc) RpcPeers() string {
+func (r *RaiRpc) RpcPeers() (string, error) {
 	params := map[string]interface{}{"action": "peers"}
-	mapRes := r.callRpc(params)
-	return mapRes["peers"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["peers"].(string), nil
 }
 
-func (r *RaiRpc) RpcPending(account, count string, threshold int, unit string, source bool) map[string]interface{} {
+func (r *RaiRpc) RpcPending(account, count string, threshold int, unit string, source bool) (map[string]interface{}, error) {
 	// count = "4096", threshold = 0, unit = "raw", source = false
 	params := map[string]interface{}{"action": "pending", "account": account,
 		"count": count, "threshold": threshold, "source": source}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
 	blocks := mapRes["blocks"].(map[string]interface{})
 	if source {
 		for k, v := range blocks {
@@ -500,165 +647,230 @@ func (r *RaiRpc) RpcPending(account, count string, threshold int, unit string, s
 			blocks[hash] = r.ToUnit(v.(string), "raw", unit)
 		}
 	}
-	return blocks
+	return blocks, nil
 }
 
-func (r *RaiRpc) RpcPendingExists(hash string) string {
+func (r *RaiRpc) RpcPendingExists(hash string) (string, error) {
 	params := map[string]interface{}{"action": "pending_exists", "hash": hash}
-	mapRes := r.callRpc(params)
-	return mapRes["exists"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+
+	return mapRes["exists"].(string), nil
 }
 
-func (r *RaiRpc) RpcReceive(wallet, account, block, work string) string {
+func (r *RaiRpc) RpcReceive(wallet, account, block, work string) (string, error) {
 	// work = "0000000000000000"
 	params := map[string]interface{}{"action": "receive", "wallet": wallet,
 		"account": account, "block": block, "work": work}
-	mapRes := r.callRpc(params)
-	return mapRes["block"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["block"].(string), nil
 }
 
-func (r *RaiRpc) RpcReceiveMinimum(unit string) string {
+func (r *RaiRpc) RpcReceiveMinimum(unit string) (string, error) {
 	// unit = "raw"
 	params := map[string]interface{}{"action": "receive_minimum"}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
 	amount := r.ToUnit(mapRes["amount"].(string), "raw", unit)
-	return amount
+	return amount, nil
 }
 
-func (r *RaiRpc) RpcReceiveMinimumSet(amount, unit string) string {
+func (r *RaiRpc) RpcReceiveMinimumSet(amount, unit string) (string, error) {
 	// unit = "raw"
 	rawAmount := r.ToUnit(amount, unit, "raw")
 	params := map[string]interface{}{"action": "receive_minimum_set", "amount": rawAmount}
-	mapRes := r.callRpc(params)
-	return mapRes["success"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["success"].(string), nil
 }
 
-func (r *RaiRpc) RpcRepresentatives(unit, count, sorting string) map[string]interface{} {
+func (r *RaiRpc) RpcRepresentatives(unit, count, sorting string) (map[string]interface{}, error) {
 	// unit = "raw", count = "1048576", sorting = false
 	params := map[string]interface{}{"action": "representatives", "count": count, "sorting": sorting}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
 	representatives := mapRes["representatives"].(map[string]interface{})
 	if unit != "raw" {
 		for k, v := range representatives {
 			representatives[k] = r.ToUnit(v.(string), "raw", unit)
 		}
 	}
-	return representatives
+	return representatives, nil
 }
 
-func (r *RaiRpc) RpcRepublish(hash, count, sources string) string {
+func (r *RaiRpc) RpcRepublish(hash, count, sources string) (string, error) {
 	// count = 1024, sources = 2
 	params := map[string]interface{}{"action": "republish", "hash": hash, "count": count, "sources": sources}
-	mapRes := r.callRpc(params)
-	return mapRes["blocks"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["blocks"].(string), nil
 }
 
-func (r *RaiRpc) RpcSearchPending(wallet string) string {
+func (r *RaiRpc) RpcSearchPending(wallet string) (string, error) {
 	params := map[string]interface{}{"action": "search_pending", "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes["started"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["started"].(string), nil
 }
 
-func (r *RaiRpc) RpcSearchPendingAll() string {
+func (r *RaiRpc) RpcSearchPendingAll() (string, error) {
 	params := map[string]interface{}{"action": "search_pending_all"}
-	mapRes := r.callRpc(params)
-	return mapRes["success"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["success"].(string), nil
 }
 
-func (r *RaiRpc) RpcSend(wallet, source, destination, amount, unit string) string {
+func (r *RaiRpc) RpcSend(wallet, source, destination, amount, unit string) (string, error) {
 	// unit = "raw"
 	rawAmount := r.ToUnit(amount, unit, "raw")
 	params := map[string]interface{}{"action": "send", "wallet": wallet, "source": source,
 		"destination": destination, "amount": rawAmount}
-	mapRes := r.callRpc(params)
-	return mapRes["block"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["block"].(string), nil
 }
 
-func (r *RaiRpc) RpcStop() string {
+func (r *RaiRpc) RpcStop() (string, error) {
 	params := map[string]interface{}{"action": "stop"}
-	mapRes := r.callRpc(params)
-	return mapRes["success"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["success"].(string), nil
 }
 
-func (r *RaiRpc) RpcSuccessors(block, count string) string {
+func (r *RaiRpc) RpcSuccessors(block, count string) (string, error) {
 	// count = "4096"
 	params := map[string]interface{}{"action": "successors", "block": block, "count": count}
-	mapRes := r.callRpc(params)
-	return mapRes["blocks"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["blocks"].(string), nil
 }
 
-func (r *RaiRpc) RpcUnchecked(count string) map[string]interface{} {
+func (r *RaiRpc) RpcUnchecked(count string) (map[string]interface{}, error) {
 	// count = "4096"
 	params := map[string]interface{}{"action": "unchecked", "count": count}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
 	blocks := mapRes["blocks"].(map[string]interface{})
 	for k, v := range blocks {
 		var val interface{}
-		json.Unmarshal([]byte(v.(string)), &val)
+		if err := json.Unmarshal([]byte(v.(string)), &val); err != nil {
+			return nil, err
+		}
 		blocks[k] = val
 	}
-	return blocks
+	return blocks, nil
 }
 
-func (r *RaiRpc) RpcUncheckedClear() string {
+func (r *RaiRpc) RpcUncheckedClear() (string, error) {
 	params := map[string]interface{}{"action": "unchecked_clear"}
-	mapRes := r.callRpc(params)
-	return mapRes["success"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["success"].(string), nil
 }
 
-func (r *RaiRpc) RpcUncheckedGet(hash string) string {
+func (r *RaiRpc) RpcUncheckedGet(hash string) (string, error) {
 	params := map[string]interface{}{"action": "unchecked_get", "hash": hash}
-	mapRes := r.callRpc(params)
-	return mapRes["contents"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["contents"].(string), nil
 }
 
-func (r *RaiRpc) RpcUcheckedKeys(key, count string) interface{} {
+func (r *RaiRpc) RpcUcheckedKeys(key, count string) (interface{}, error) {
 	// key = "0000000000000000000000000000000000000000000000000000000000000000", count = "4096"
 	params := map[string]interface{}{"action": "unchecked_keys", "key": key, "count": count}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
 	unchecked := mapRes["unchecked"].(interface{})
 	for k, v := range unchecked.([]interface{}) {
 		var contents interface{}
-		json.Unmarshal([]byte(v.(map[string]interface{})["contents"].(string)), &contents)
+		if err := json.Unmarshal([]byte(v.(map[string]interface{})["contents"].(string)), &contents); err != nil {
+			return nil, err
+		}
 		unchecked.([]interface{})[k].(map[string]interface{})["contents"] = contents
 	}
-	return unchecked
+	return unchecked, nil
 }
 
-func (r *RaiRpc) RpcValidateAccountNumber(account string) string {
+func (r *RaiRpc) RpcValidateAccountNumber(account string) (string, error) {
 	params := map[string]interface{}{"action": "validate_account_number", "account": account}
-	mapRes := r.callRpc(params)
-	return mapRes["valid"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["valid"].(string), nil
 }
 
-func (r *RaiRpc) RpcVersion() map[string]interface{} {
-	params := map[string]interface{}{"action": "version"}
-	mapRes := r.callRpc(params)
-	return mapRes
+func (r *RaiRpc) Version() (*Version, error) {
+	resp := new(Version)
+	err := r.call(Action{Name:"version"}, resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
-func (r *RaiRpc) RpcWalletAdd(wallet, key string) string {
+func (r *RaiRpc) RpcWalletAdd(wallet, key string) (string, error) {
 	params := map[string]interface{}{"action": "wallet_add", "wallet": wallet, "key": key}
-	mapRes := r.callRpc(params)
-	return mapRes["account"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["account"].(string), nil
 }
 
-func (r *RaiRpc) RpcWalletBalanceTotal(wallet, unit string) map[string]interface{} {
+func (r *RaiRpc) RpcWalletBalanceTotal(wallet, unit string) (map[string]interface{}, error) {
 	// unit = "raw"
 	params := map[string]interface{}{"action": "wallet_balance_total", "wallet": wallet}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
 	walletBalanceTotals := map[string]interface{}{"balance": r.ToUnit(mapRes["balance"].(string), "raw", unit),
 		"pending": r.ToUnit(mapRes["pending"].(string), "raw", unit)}
-	return walletBalanceTotals
+	return walletBalanceTotals, nil
 }
 
-func (r *RaiRpc) RpcWalletBalances(wallet, unit string, threshold int) map[string]interface{} {
+func (r *RaiRpc) RpcWalletBalances(wallet, unit string, threshold int) (map[string]interface{}, error) {
 	// unit = "raw", threshold = 0
 	if threshold != 0 {
 		threshold, _ = strconv.Atoi(r.ToUnit(strconv.Itoa(threshold), unit, "raw"))
 	}
 	params := map[string]interface{}{"action": "wallet_balances", "wallet": wallet, "threshold": threshold}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
 	walletBalances := mapRes["balances"].(map[string]interface{})
 	for k, v := range walletBalances {
 		balance := r.ToUnit(v.(map[string]interface{})["balance"].(string), "raw", unit)
@@ -666,46 +878,64 @@ func (r *RaiRpc) RpcWalletBalances(wallet, unit string, threshold int) map[strin
 		walletBalances[k].(map[string]interface{})["balance"] = balance
 		walletBalances[k].(map[string]interface{})["pending"] = pending
 	}
-	return walletBalances
+	return walletBalances, nil
 }
 
-func (r *RaiRpc) RpcWalletChangeSeed(wallet, seed string) string {
+func (r *RaiRpc) RpcWalletChangeSeed(wallet, seed string) (string, error) {
 	params := map[string]interface{}{"action": "wallet_change_seed", "wallet": wallet, "seed": seed}
-	mapRes := r.callRpc(params)
-	return mapRes["success"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["success"].(string), nil
 }
 
-func (r *RaiRpc) RpcWalletContains(wallet, account string) string {
+func (r *RaiRpc) RpcWalletContains(wallet, account string) (string, error) {
 	params := map[string]interface{}{"action": "wallet_contains", "wallet": wallet, "account": account}
-	mapRes := r.callRpc(params)
-	return mapRes["exists"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["exists"].(string), nil
 }
 
-func (r *RaiRpc) RpcWalletCreate() string {
+func (r *RaiRpc) RpcWalletCreate() (string, error) {
 	params := map[string]interface{}{"action": "wallet_create"}
-	mapRes := r.callRpc(params)
-	return mapRes["wallet"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["wallet"].(string), nil
 }
 
-func (r *RaiRpc) RpcWalletDestroy(wallet string) map[string]interface{} {
+func (r *RaiRpc) RpcWalletDestroy(wallet string) (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "wallet_destroy", "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
+	return mapRes, nil
 }
 
-func (r *RaiRpc) RpcWalletExport(wallet string) string {
+func (r *RaiRpc) RpcWalletExport(wallet string) (string, error) {
 	params := map[string]interface{}{"action": "wallet_export", "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes["json"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["json"].(string), nil
 }
 
-func (r *RaiRpc) RpcWalletFrontiers(wallet string) string {
+func (r *RaiRpc) RpcWalletFrontiers(wallet string) (string, error) {
 	params := map[string]interface{}{"action": "wallet_frontiers", "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes["frontiers"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["frontiers"].(string), nil
 }
 
-func (r *RaiRpc) RpcWalletPending(wallet, count string, threshold int, unit string, source bool) map[string]interface{} {
+func (r *RaiRpc) RpcWalletPending(wallet, count string, threshold int, unit string, source bool) (map[string]interface{}, error) {
 	//count = "4096", threshold = 0, unit = "raw", source = false
 	thresholdStr := "0"
 	if threshold != 0 {
@@ -713,9 +943,12 @@ func (r *RaiRpc) RpcWalletPending(wallet, count string, threshold int, unit stri
 	}
 	params := map[string]interface{}{"action": "wallet_pending", "wallet": wallet,
 		"count": count, "threshold": thresholdStr, "source": source}
-	mapRes := r.callRpc(params)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
 	if mapRes["blocks"] == "" {
-		return nil
+		return nil, err
 	}
 	blocks := mapRes["blocks"].(map[string]interface{})
 	if source {
@@ -729,102 +962,159 @@ func (r *RaiRpc) RpcWalletPending(wallet, count string, threshold int, unit stri
 			blocks[hash] = r.ToUnit(v.(string), "raw", unit)
 		}
 	}
-	return blocks
+	return blocks, err
 }
 
-func (r *RaiRpc) RpcWalletRepresentative(wallet string) string {
+func (r *RaiRpc) RpcWalletRepresentative(wallet string) (string, error) {
 	params := map[string]interface{}{"action": "wallet_representative", "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes["representative"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["representative"].(string), nil
 }
 
-func (r *RaiRpc) RpcWalletRepresentativeSet(wallet, representative string) string {
+func (r *RaiRpc) RpcWalletRepresentativeSet(wallet, representative string) (string, error) {
 	params := map[string]interface{}{"action": "wallet_representative_set",
 		"wallet": wallet, "representative": representative}
-	mapRes := r.callRpc(params)
-	return mapRes["set"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["set"].(string), nil
 }
 
-func (r *RaiRpc) RpcWalletRepublish(wallet, count string) string {
+func (r *RaiRpc) RpcWalletRepublish(wallet, count string) (string, error) {
 	//  count = 2
 	params := map[string]interface{}{"action": "wallet_republish", "wallet": wallet, "count": count}
-	mapRes := r.callRpc(params)
-	return mapRes["blocks"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["blocks"].(string), nil
 }
 
-func (r *RaiRpc) RpcWalletWorkGet(wallet string) string {
+func (r *RaiRpc) RpcWalletWorkGet(wallet string) (string, error) {
 	params := map[string]interface{}{"action": "wallet_work_get", "wallet": wallet}
-	mapRes := r.callRpc(params)
-	return mapRes["works"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["works"].(string), nil
 }
 
-func (r *RaiRpc) RpcWorkCancel(hash string) map[string]interface{} {
+func (r *RaiRpc) RpcWorkCancel(hash string) (map[string]interface{}, error) {
 	params := map[string]interface{}{"action": "work_cancel", "hash": hash}
-	mapRes := r.callRpc(params)
-	return mapRes
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return nil, err
+	}
+	return mapRes, nil
 }
 
-func (r *RaiRpc) RpcWorkGenerate(hash string) string {
+func (r *RaiRpc) RpcWorkGenerate(hash string) (string, error) {
 	params := map[string]interface{}{"action": "work_generate", "hash": hash}
-	mapRes := r.callRpc(params)
-	return mapRes["work"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["work"].(string), nil
 }
 
-func (r *RaiRpc) RpcWorkGet(wallet, account string) string {
+func (r *RaiRpc) RpcWorkGet(wallet, account string) (string, error) {
 	params := map[string]interface{}{"action": "work_get", "wallet": wallet, "account": account}
-	mapRes := r.callRpc(params)
-	return mapRes["work"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["work"].(string), nil
 }
 
-func (r *RaiRpc) RpcWorkSet(wallet, account, work string) string {
+func (r *RaiRpc) RpcWorkSet(wallet, account, work string) (string, error) {
 	params := map[string]interface{}{"action": "work_set", "wallet": wallet, "account": account, "work": work}
-	mapRes := r.callRpc(params)
-	return mapRes["success"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["success"].(string), nil
 }
 
-func (r *RaiRpc) RpcWorkValidate(work, hash string) string {
+func (r *RaiRpc) RpcWorkValidate(work, hash string) (string, error) {
 	params := map[string]interface{}{"action": "work_validate", "work": work, "hash": hash}
-	mapRes := r.callRpc(params)
-	return mapRes["valid"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["valid"].(string), nil
 }
 
-func (r *RaiRpc) RpcWorkPeerAdd(address, port string) string {
+func (r *RaiRpc) RpcWorkPeerAdd(address, port string) (string, error) {
 	// address = "::1", port = "7076"
 	params := map[string]interface{}{"action": "work_peer_add", "address": address, "port": port}
-	mapRes := r.callRpc(params)
-	return mapRes["success"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["success"].(string), nil
 }
 
-func (r *RaiRpc) RpcWorkPeers() string {
+func (r *RaiRpc) RpcWorkPeers() (string, error) {
 	params := map[string]interface{}{"action": "work_peers"}
-	mapRes := r.callRpc(params)
-	return mapRes["work_peers"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["work_peers"].(string), nil
 }
 
-func (r *RaiRpc) RpcWorkPeersClear() string {
+func (r *RaiRpc) RpcWorkPeersClear() (string, error) {
 	params := map[string]interface{}{"action": "work_peers_clear"}
-	mapRes := r.callRpc(params)
-	return mapRes["success"].(string)
+	mapRes, err := r.callRpc(params)
+	if err != nil {
+		return "", err
+	}
+	return mapRes["success"].(string), nil
 }
 
-func (r *RaiRpc) callRpc(params map[string]interface{}) map[string]interface{} {
+func (r *RaiRpc) callRpc(params map[string]interface{}) (map[string]interface{}, error) {
 	// Prepare json POST request
-	reqString, err := json.Marshal(params)
-	res, err := http.Post(r.url, "application/json", strings.NewReader(string(reqString)))
+	body, err := json.Marshal(params)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	var byteTab []byte
-	byteTab, err = ioutil.ReadAll(res.Body)
-	res.Body.Close()
+
+	res, err := http.Post(r.url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("error sending request (%v)", err)
 	}
-	var dataMap map[string]interface{}
-	err = json.Unmarshal(byteTab, &dataMap)
+	defer res.Body.Close()
+
+	data := make(map[string]interface{})
+	if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("error unmarschaling response body (%v)", err)
+	}
+	return data, nil
+}
+
+func (r *RaiRpc) call(params interface{}, dest interface{}) error {
+	// Prepare json POST request
+	body, err := json.Marshal(params)
 	if err != nil {
-		//error handling goes here
-		fmt.Printf("err %s", err)
+		return err
 	}
-	return dataMap
+
+	resp, err := http.Post(r.url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("error sending request (%v)", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("rai blockes node responded with status code (%d)", resp.StatusCode)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&dest); err != nil {
+		return fmt.Errorf("error unmarschaling response body (%v)", err)
+	}
+	return nil
 }
