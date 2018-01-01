@@ -13,6 +13,13 @@ $ go get -u github.com/devmahno/GoRaiRpc
 This will retrieve the library and install the `GoRaiRpc`
 utility into your `$GOPATH`.
 
+### Authors
+
+* **Devmahno** - *Initial work* - [devmahno](https://github.com/devmahno)
+* **Marcel Edmund Franke** - *Refactoring, optimization* - [donutloop](https://github.com/donutloop)
+
+See also the list of [contributors](https://github.com/devmahno/GoRaiRpc/graphs/contributors) who participated in this project.
+
 #### Donations
 If you feel like donating some, here is an address for XRB.
 
